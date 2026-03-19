@@ -1,0 +1,8 @@
+# Runtime deps for single_file_app.py (FastAPI + OpenAI intake demo)
+# Install: python -m pip install -r requirements.txt
+
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+openai
