@@ -1,0 +1,11 @@
+services:
+  web:
+    build: .
+    container_name: loan-intake-app
+    ports:
+      - "8000:8000"
+    # Docker Compose loads `.env` from this folder for ${VAR} substitution automatically.
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+    restart: unless-stopped
