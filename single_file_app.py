@@ -604,6 +604,15 @@ def frontend_html() -> str:
         font-size: 12.5px;
       }
       .hidden { display: none !important; }
+      #crmSection { scroll-margin-top: 16px; }
+      @keyframes copyBtnPress {
+        0% { transform: scale(1); box-shadow: none; }
+        45% { transform: scale(0.94); box-shadow: 0 0 0 3px rgba(37,99,235,0.35); }
+        100% { transform: scale(1); box-shadow: none; }
+      }
+      .copyBtn-press {
+        animation: copyBtnPress 0.45s ease;
+      }
     </style>
   </head>
   <body>
@@ -634,6 +643,7 @@ def frontend_html() -> str:
             <div class="row">
               <button class="primary" id="analyzeBtn">Analyze application</button>
               <button class="ghost" id="clearBtn">Clear</button>
+              <button class="ghost" type="button" id="copyJsonJumpBtn" disabled title="Run analysis first, then scroll to CRM JSON and copy">Copy JSON</button>
             </div>
             <div class="row" id="sampleRow"></div>
             <div id="errorBox" class="error hidden"></div>
@@ -669,10 +679,10 @@ def frontend_html() -> str:
             <div id="riskBox" class="muted">Risk level and flags will appear here.</div>
           </article>
 
-          <article class="card">
+          <article class="card" id="crmSection">
             <div class="cardTop">
               <h2 class="cardTitle">CRM-ready JSON</h2>
-              <button id="copyBtn" class="ghost hidden">Copy JSON</button>
+              <button id="copyBtn" type="button" class="ghost hidden">Copy JSON</button>
             </div>
             <pre id="crmPre" class="hidden"></pre>
             <div id="crmPlaceholder" class="muted">The integration-ready CRM payload will appear here after analysis.</div>
@@ -707,6 +717,8 @@ def frontend_html() -> str:
       const rawTextEl = document.getElementById("rawText");
       const analyzeBtn = document.getElementById("analyzeBtn");
       const clearBtn = document.getElementById("clearBtn");
+      const copyJsonJumpBtn = document.getElementById("copyJsonJumpBtn");
+      const crmSection = document.getElementById("crmSection");
       const errorBox = document.getElementById("errorBox");
       const sampleRow = document.getElementById("sampleRow");
 
@@ -727,6 +739,20 @@ def frontend_html() -> str:
       const statusText = document.getElementById("statusText");
       const statusLabel = document.getElementById("statusLabel");
       const progressBar = document.getElementById("progressBar");
+
+      let lastCrm = null;
+
+      async function copyCrmToClipboard(showBottomFeedback) {
+        if (!lastCrm) return false;
+        const text = JSON.stringify(lastCrm, null, 2);
+        await navigator.clipboard.writeText(text);
+        if (showBottomFeedback && !copyBtn.classList.contains("hidden")) {
+          const old = copyBtn.textContent;
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => { copyBtn.textContent = old; }, 1200);
+        }
+        return true;
+      }
 
       function setProgress(label, text, percent) {
         statusLabel.textContent = label;
@@ -826,6 +852,10 @@ def frontend_html() -> str:
       function setLoading(on) {
         analyzeBtn.disabled = on;
         clearBtn.disabled = on;
+        copyJsonJumpBtn.disabled = on || !lastCrm;
+        copyJsonJumpBtn.title = lastCrm
+          ? "Scroll to CRM JSON and copy to clipboard"
+          : "Run analysis first, then scroll to CRM JSON and copy";
         [...sampleRow.querySelectorAll("button")].forEach(b => b.disabled = on);
         analyzeBtn.textContent = on ? "Analyzing..." : "Analyze application";
       }
@@ -858,6 +888,7 @@ def frontend_html() -> str:
           renderRisk(data.risk_level, data.risk_flags);
 
           const crm = data.crm_ready_json;
+          lastCrm = crm;
           crmPlaceholder.classList.add("hidden");
           crmPre.classList.remove("hidden");
           copyBtn.classList.remove("hidden");
@@ -866,14 +897,13 @@ def frontend_html() -> str:
           note.classList.remove("hidden");
           copyBtn.onclick = async () => {
             try {
-              await navigator.clipboard.writeText(JSON.stringify(crm, null, 2));
-              const old = copyBtn.textContent;
-              copyBtn.textContent = "Copied!";
-              setTimeout(() => { copyBtn.textContent = old; }, 1200);
+              await copyCrmToClipboard(true);
             } catch (_) {
               setError("Clipboard blocked by browser.");
             }
           };
+          copyJsonJumpBtn.disabled = false;
+          copyJsonJumpBtn.title = "Scroll to CRM JSON and copy to clipboard";
 
           setProgress("Done", "Analysis complete. Results are ready.", 100);
         } catch (e) {
@@ -885,6 +915,27 @@ def frontend_html() -> str:
       }
 
       analyzeBtn.onclick = handleAnalyze;
+
+      copyJsonJumpBtn.onclick = async () => {
+        if (!lastCrm) {
+          setError("Run an analysis first — CRM JSON will appear below.");
+          crmSection.scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
+        setError("");
+        crmSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        await new Promise((r) => setTimeout(r, 520));
+        copyBtn.classList.remove("copyBtn-press");
+        void copyBtn.offsetWidth;
+        copyBtn.classList.add("copyBtn-press");
+        setTimeout(() => copyBtn.classList.remove("copyBtn-press"), 480);
+        try {
+          await copyCrmToClipboard(true);
+        } catch (_) {
+          setError("Clipboard blocked by browser.");
+        }
+      };
+
       clearBtn.onclick = () => {
         rawTextEl.value = "";
         updateCounts();
