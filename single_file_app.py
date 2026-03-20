@@ -742,10 +742,44 @@ def frontend_html() -> str:
 
       let lastCrm = null;
 
+      // Clipboard API only works on https:// or localhost. On http://VPS use fallback.
+      function fallbackCopyText(text) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-2000px";
+        ta.style.top = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+          ta.setSelectionRange(0, text.length);
+        } catch (_) {}
+        let ok = false;
+        try {
+          ok = document.execCommand("copy");
+        } catch (_) {}
+        document.body.removeChild(ta);
+        return ok;
+      }
+
       async function copyCrmToClipboard(showBottomFeedback) {
         if (!lastCrm) return false;
         const text = JSON.stringify(lastCrm, null, 2);
-        await navigator.clipboard.writeText(text);
+        let ok = false;
+        if (navigator.clipboard && window.isSecureContext) {
+          try {
+            await navigator.clipboard.writeText(text);
+            ok = true;
+          } catch (_) {}
+        }
+        if (!ok) {
+          ok = fallbackCopyText(text);
+        }
+        if (!ok) {
+          throw new Error("Copy failed");
+        }
         if (showBottomFeedback && !copyBtn.classList.contains("hidden")) {
           const old = copyBtn.textContent;
           copyBtn.textContent = "Copied!";
@@ -899,7 +933,9 @@ def frontend_html() -> str:
             try {
               await copyCrmToClipboard(true);
             } catch (_) {
-              setError("Clipboard blocked by browser.");
+              setError(
+                "Could not copy automatically. Select the JSON below and press Ctrl+C, or serve the app over HTTPS."
+              );
             }
           };
           copyJsonJumpBtn.disabled = false;
@@ -923,17 +959,20 @@ def frontend_html() -> str:
           return;
         }
         setError("");
+        // Copy first (same user gesture) — required for execCommand fallback on plain HTTP.
+        try {
+          await copyCrmToClipboard(true);
+        } catch (_) {
+          setError(
+            "Could not copy automatically. Select the JSON below and press Ctrl+C, or serve the app over HTTPS."
+          );
+        }
         crmSection.scrollIntoView({ behavior: "smooth", block: "start" });
-        await new Promise((r) => setTimeout(r, 520));
+        await new Promise((r) => setTimeout(r, 400));
         copyBtn.classList.remove("copyBtn-press");
         void copyBtn.offsetWidth;
         copyBtn.classList.add("copyBtn-press");
         setTimeout(() => copyBtn.classList.remove("copyBtn-press"), 480);
-        try {
-          await copyCrmToClipboard(true);
-        } catch (_) {
-          setError("Clipboard blocked by browser.");
-        }
       };
 
       clearBtn.onclick = () => {
