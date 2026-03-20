@@ -33,8 +33,3 @@ Then open: http://localhost:8000/
 - `POST /process-application`  
 - Body: `{ "raw_text": "..." }`
 
----
-
-## Other files in the repo (optional)
-
-The repo may also include an older split layout under `backend/` + `frontend/` (Vite/React) and assignment materials — **to run the demo you only need `single_file_app.py` + `setup_and_run`**.
