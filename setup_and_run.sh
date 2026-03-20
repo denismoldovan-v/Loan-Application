@@ -19,7 +19,7 @@ if [[ ! -f requirements.txt ]] || [[ ! -f single_file_app.py ]]; then
 fi
 
 if [[ ! -f .env ]]; then
-  echo "No .env yet — enter your OpenAI API key (or leave empty for fallback-only mode)."
+  echo "No .env file yet — enter your OpenAI API key (or press Enter for fallback-only mode)."
   read -r -p "OpenAI API key: " OPENAI_KEY
   {
     echo "OPENAI_API_KEY=${OPENAI_KEY}"
